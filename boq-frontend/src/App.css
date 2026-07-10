@@ -1,0 +1,185 @@
+:root {
+  --teal-dark: #0f2c2d;
+  --teal-main: #164e50;
+  --teal-light: #e8f3f3;
+  --gold-main: #d4af37;
+  --gold-hover: #e5c354;
+  --bg-page: #f8fafc;
+  --border-color: #e2e8f0;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.app-container {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+/* Header */
+.brand-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+.brand-logo-text {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--teal-dark);
+}
+.brand-subtext {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin: 4px 0;
+}
+
+/* Control Panel */
+.control-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
+  margin-bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.input-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--teal-main);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.text-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+.text-input:focus {
+  outline: none;
+  border-color: var(--teal-main);
+  box-shadow: 0 0 0 3px var(--teal-light);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
+.btn-primary {
+  background: var(--teal-main);
+  color: white;
+}
+.btn-primary:hover { background: var(--teal-dark); }
+.btn-gold {
+  background: var(--gold-main);
+  color: var(--teal-dark);
+}
+.btn-gold:hover { background: var(--gold-hover); }
+.btn-ghost {
+  background: transparent;
+  color: var(--teal-main);
+  border: 1px dashed var(--teal-main);
+}
+.btn-ghost:hover { background: var(--teal-light); }
+
+/* Server Block Cards */
+.server-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
+  margin-bottom: 30px;
+  overflow: hidden;
+}
+
+.server-header {
+  background: var(--teal-dark);
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: white;
+}
+.server-header .input-label { color: var(--teal-light); }
+.server-header .text-input { 
+  background: rgba(255,255,255,0.1); 
+  border: 1px solid rgba(255,255,255,0.2); 
+  color: white; 
+}
+.server-header .text-input:focus { border-color: var(--gold-main); box-shadow: none; }
+
+/* Metrics Table inside Card */
+.metric-table-wrapper {
+  padding: 20px 24px;
+}
+.metric-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+.metric-table th {
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 0 12px 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+.metric-table td {
+  padding: 12px;
+  background: var(--bg-page);
+}
+.metric-table tr td:first-child { border-radius: 6px 0 0 6px; }
+.metric-table tr td:last-child { border-radius: 0 6px 6px 0; }
+
+.remove-btn {
+  color: #ef4444;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+}
+.remove-btn:hover { background: #fee2e2; }
+
+/* Totals Bar */
+.totals-bar {
+  background: var(--teal-light);
+  padding: 24px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.25rem;
+  color: var(--teal-dark);
+  font-weight: 700;
+}
