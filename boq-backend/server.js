@@ -20,9 +20,7 @@ const pool = new Pool({
 // --- 2. DATABASE INITIALIZATION & SEEDING ---
 async function initializeDatabase() {
     try {
-        // Drop and recreate table to ensure it matches the exact DOS BOQ requirements
         await pool.query('DROP TABLE IF EXISTS product_catalog;');
-        
         await pool.query(`
             CREATE TABLE product_catalog (
                 id SERIAL PRIMARY KEY,
@@ -31,24 +29,52 @@ async function initializeDatabase() {
             );
         `);
         
-        // Exact catalog extracted from DOS BOQ.csv
         await pool.query(`
             INSERT INTO product_catalog (metric_name, unit_price_bdt) VALUES
-            ('Compute - Standard - E4 - OCPU (OCPU Per Hour)', 2168),
-            ('Compute - Standard - E4  - Memory (Gigabyte Per Hour)', 130),
-            ('Boot Storage - Block Volume - Storage (Gigabyte Storage Capacity Per Month)', 20),
-            ('Data Storage - Block Volume - Storage (Gigabyte Storage Capacity Per Month)', 20),
-            ('Oracle Database Cloud Service - Enterprise Edition - OCPU Per Hour', 75899.4),
-            ('Oracle Database Cloud Service - Enterprise Edition - BYOL - OCPU Per Hour', 16973.9),
-            ('Database Cloud Service - Enterprise Edition - Extra Storage - Block Volume (Gigabyte Storage Capacity Per Month)', 20),
-            ('OCI - FastConnect 1 Gbps (Port Month)', 19111),
+            ('Compute E4 Standard - OCPU', 2168.0),
+            ('Compute - E4 Standard - Memory (GB)', 130.0),
+            ('Boot Storage (GB)', 20.0),
+            ('Public IP', 500.0),
+            ('Windows Operating System', 7905.0),
+            ('Compute - E4 Standard - OCPU', 2168.0),
+            ('Compute X9 Standard - OCPU', 3597.0),
+            ('Compute - X9 Standard - Memory (GB)', 130.0),
+            ('Block Storage (GB)', 25.0),
+            ('Object Storage - Storage (GB Capacity Per Month)', 12.0),
+            ('Object Storage - Requests (10,000 Requests per Month)', 1.0),
+            ('Oracle Autonomous Transaction Processing (ECPU Per Hour)', 31050.0),
+            ('Autonomous Database Storage for Transaction Processing  (GB Per Month)', 18.0),
+            ('Backup - Oracle Autonomous Database Storage (GB)', 6.0),
+            ('MySQL Database - Storage (Gigabyte Storage Capacity Per Month)', 6.0),
+            ('OCI - HeatWave (HeatWave Capacity Per Month)', 1090.0),
+            ('MySQL Database - ECPU (ECPU Per Month)', 3468.0),
+            ('Oracle Base Database Service - Extreme Performance (OCPU per Month)', 116565.73),
+            ('Database Optimized Storage (GB)', 12.57),
+            ('Database with PostgreSQL - X86 - OCPU', 12484.95),
+            ('Compute - Standard - E4 - OCPU', 2168.0),
+            ('Compute - Standard - E4  - Memory', 130.0),
+            ('Oracle Cloud Infrastructure - Email Delivery - 1,000 Emails Sent', 12.0),
             ('Oracle Cloud Infrastructure - Monitoring - Retrieval', 0.25),
-            ('Object Storage - Storage (GB Capacity Per Month)', 12),
-            ('Load Balancer - Base', 1000),
-            ('Load Balancer Bandwidth (Mbps)', 10),
-            ('Public IP', 500),
-            ('Web Application Firewall - Requests (0 - 1,000,000 Incoming Requests)', 85),
-            ('Web Application Firewall - Instance ', 600)
+            ('BDCCL-DRCC Analytics Cloud - Enterprise (OCPU per Month)', 193416.0),
+            ('OCI Kubernetes Engine - Enhanced Cluster (Cluster Per Hour)', 8696.0),
+            ('Compute - Standard - E4 - OCPU (OCPU Per Hour)', 2168.0),
+            ('Oracle Cloud Infrastructure Cache with Redis - Low Memory (up to 10 GB per node) (Redis Memory Gigabyte per Month)', 2471.51),
+            ('Oracle Cloud Infrastructure Cache with Redis - High Memory (over 10 GB per node) (Redis Memory Gigabyte per Month)', 1732.61),
+            ('BDCCL-DRCC Vulnerability Scanning Service (Instance Per Month)', 100.0),
+            ('Oracle Cloud Guard', 0.0),
+            ('Oracle Cloud Guard - Threat Detector - OCI Audit Logs', 0.0),
+            ('Oracle Cloud Guard Instance Security Enterprise (Node per month)', 879.04),
+            ('Oracle Cloud Guard Instance Security Ad hoc Queries Enterprise (First 950,000 Requests)', 0.0),
+            ('Network Firewall Instance (Instance Per month)', 350343.07),
+            ('Network Firewall Data Processing-Greater than 10240 Gigabytes of Data Processed (GB Data Processed/Month)', 1.75),
+            ('Load Balancer - Base', 1000.0),
+            ('Load Balancer Bandwidth (Mbps)', 10.0),
+            ('Web Application Firewall - Requests (0 - 1,000,000 Incoming Requests)', 85.0),
+            ('Web Application Firewall - Instance', 600.0),
+            ('Site to site GRE over IPsec VPN over private data connectivity', 10000.0),
+            ('Set up (one time cost)', 10000.0),
+            ('FastConnect 1 Gbps (Port Month)', 19111.0),
+            ('Data Connectivity Bandwidth (Per 10 Mbps)', 2500.0);
         `);
         console.log("Database seeded successfully with DOS BOQ catalog.");
     } catch (err) {
@@ -56,6 +82,7 @@ async function initializeDatabase() {
     }
 }
 initializeDatabase();
+
 
 // --- 3. API: FETCH FULL CATALOG ---
 app.get('/api/products', async (req, res) => {
@@ -87,7 +114,7 @@ app.post('/api/quotes/generate', async (req, res) => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('BoQ');
 
-    // Branding: Bangladesh Data Center Company Limited (BDCCL)
+    // Branding
     worksheet.mergeCells('A1:I1');
     worksheet.getCell('A1').value = 'Bangladesh Data Center Company Limited (BDCCL)';
     worksheet.getCell('A1').font = { size: 16, bold: true };
@@ -98,137 +125,163 @@ app.post('/api/quotes/generate', async (req, res) => {
     worksheet.getCell('A2').font = { size: 10 };
     worksheet.getCell('A2').alignment = { horizontal: 'center' };
 
-    // Standard Quotation Title
     worksheet.mergeCells('A4:I4');
     worksheet.getCell('A4').value = 'Quotation';
     worksheet.getCell('A4').font = { size: 14, bold: true, underline: true };
     worksheet.getCell('A4').alignment = { horizontal: 'center' };
 
-    // Customer Information Block
     worksheet.getCell('A6').value = 'Customer Information';
     worksheet.getCell('A6').font = { bold: true };
-    
     worksheet.getCell('H6').value = 'Quotation Date';
     worksheet.getCell('H6').font = { bold: true };
     worksheet.getCell('I6').value = quoteDate;
-
     worksheet.getCell('A7').value = 'Organization Name';
     worksheet.getCell('A7').font = { bold: true };
     worksheet.getCell('B7').value = organizationName;
 
-    // Table Headers (Row 14)
-    worksheet.getRow(14).values = [
-        'SL No.', 'Server', 'Instance Quantity', 'Requirements/Metric', 
-        'Part QTY', 'Requirements/Qty', 'Usage QTY (Monthly hour)', 
-        'Unit Price (BDT)', 'Total (Per Month) (BDT)'
-    ];
-    
-    // Style the headers
+    // Headers
+    worksheet.getRow(14).values = [ 'SL No.', 'Service Name', 'Instance Quantity', 'Requirements/Metric', 'Part QTY', 'Requirements/Qty', 'Usage QTY (Monthly hour)', 'Unit Price (BDT)', 'Total (Per Month) (BDT)' ];
     const headerRow = worksheet.getRow(14);
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     headerRow.eachCell((cell) => {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF164E50' } }; // Matches UI Teal
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF164E50' } };
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
     });
     headerRow.height = 30;
 
-    // Set Column Widths for readability
     worksheet.getColumn('A').width = 10;
-    worksheet.getColumn('B').width = 35;
+    worksheet.getColumn('B').width = 40;
     worksheet.getColumn('C').width = 15;
-    worksheet.getColumn('D').width = 50;
+    worksheet.getColumn('D').width = 60;
     worksheet.getColumn('E').width = 10;
     worksheet.getColumn('F').width = 15;
-    worksheet.getColumn('G').width = 25;
+    worksheet.getColumn('G').width = 20;
     worksheet.getColumn('H').width = 15;
     worksheet.getColumn('I').width = 20;
 
-    // Inject Line Items with DYNAMIC MERGING & ABSOLUTE FORMULAS
     let currentRow = 15;
     let groupStartRow = 15;
-    let currentInstQtyCell = 'C15'; // Tracks the master cell for formulas
-    let currentParentInstQty = 1;   // Tracks the master value for initial calculation
+    let instSubGroupStartRow = 15;
 
     lineItems.forEach((item, index) => {
         const row = worksheet.getRow(currentRow);
         
-        // 1. Detect if this is a NEW group / package
-        if (item.reqGroup !== '') {
+        if (item.isMaster) {
             groupStartRow = currentRow;
-            currentInstQtyCell = `$C$${currentRow}`; // Lock the formula to this specific row (e.g., $C$15)
-            currentParentInstQty = Number(item.instanceQty) || 1;
+            instSubGroupStartRow = currentRow;
+        } else {
+            // Split instance quantity merging purely by subGroupId
+            if (lineItems[index - 1] && lineItems[index - 1].subGroupId !== item.subGroupId) {
+                instSubGroupStartRow = currentRow;
+            }
         }
 
         const partQty = Number(item.partQty) || 1;
         const usageHours = Number(item.usageHours) || 730;
         const unitPrice = Number(item.unitPrice) || 0;
 
-        // 2. Write the row data
         row.values = [
-            item.reqGroup, 
-            item.serverName, 
-            item.instanceQty, 
-            item.metricName, 
-            partQty, 
-            // Formula Column F: Requirement Qty = Master Instance Qty * Part Qty
-            { 
-                formula: `IF(ISBLANK(${currentInstQtyCell}), 1, ${currentInstQtyCell})*E${currentRow}`, 
-                result: currentParentInstQty * partQty 
-            },
-            usageHours, 
-            unitPrice,
-            // Formula Column I: Total = Requirement Qty * Unit Price
-            { 
-                formula: `F${currentRow}*H${currentRow}`, 
-                result: (currentParentInstQty * partQty) * unitPrice 
-            }
+            item.reqGroup, item.serverName, Number(item.instanceQty), item.metricName, partQty, 
+            { formula: `C${instSubGroupStartRow}*E${currentRow}`, result: Number(item.instanceQty) * partQty },
+            usageHours, unitPrice,
+            { formula: `F${currentRow}*H${currentRow}`, result: (Number(item.instanceQty) * partQty) * unitPrice }
         ];
 
-        // Format currencies
+        row.eachCell((cell) => { cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} }; });
         row.getCell('H').numFmt = '#,##0.00';
         row.getCell('I').numFmt = '#,##0.00';
 
-        // 3. Detect if this is the END of a group to apply Merging
-        const isLastItem = index === lineItems.length - 1;
-        const nextItemStartsNewGroup = !isLastItem && lineItems[index + 1].reqGroup !== '';
+        // Merge Instance Quantity Cell based on subGroupId
+        const isLastInSubGroup = index === lineItems.length - 1 || lineItems[index + 1].subGroupId !== item.subGroupId;
+        if (isLastInSubGroup && currentRow > instSubGroupStartRow) {
+            worksheet.mergeCells(`C${instSubGroupStartRow}:C${currentRow}`);
+            worksheet.getCell(`C${instSubGroupStartRow}`).alignment = { vertical: 'middle', horizontal: 'center' };
+        }
 
-        if (isLastItem || nextItemStartsNewGroup) {
-            // Only merge if there is more than 1 item in the group
-            if (currentRow > groupStartRow) {
-                worksheet.mergeCells(`A${groupStartRow}:A${currentRow}`);
-                worksheet.mergeCells(`B${groupStartRow}:B${currentRow}`);
-                worksheet.mergeCells(`C${groupStartRow}:C${currentRow}`);
-            }
-            
-            // Apply beautiful vertical centering to the merged blocks
+        // Merge Master Group Cells (Req Group and Service Name)
+        const isLastInGroup = index === lineItems.length - 1 || lineItems[index + 1].groupId !== item.groupId;
+        if (isLastInGroup && currentRow > groupStartRow) {
+            worksheet.mergeCells(`A${groupStartRow}:A${currentRow}`);
+            worksheet.mergeCells(`B${groupStartRow}:B${currentRow}`);
             worksheet.getCell(`A${groupStartRow}`).alignment = { vertical: 'middle', horizontal: 'center' };
             worksheet.getCell(`B${groupStartRow}`).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-            worksheet.getCell(`C${groupStartRow}`).alignment = { vertical: 'middle', horizontal: 'center' };
         }
         
         currentRow++;
     });
+    // --- VAT & SPECIAL NOTES BLOCK ---
+    const lastDataRow = currentRow - 1;
 
-    // Grand Total Row
+    // Subtotal Row
     worksheet.mergeCells(`A${currentRow}:H${currentRow}`);
-    const totalLabelCell = worksheet.getCell(`A${currentRow}`);
-    totalLabelCell.value = 'Grand Total (Per Month):';
-    totalLabelCell.font = { bold: true };
-    totalLabelCell.alignment = { horizontal: 'right' };
-    
-    // Formula for Grand Total
-    const grandTotalCell = worksheet.getCell(`I${currentRow}`);
-    grandTotalCell.value = { formula: `SUM(I15:I${currentRow - 1})` };
-    grandTotalCell.font = { bold: true };
-    grandTotalCell.numFmt = '#,##0.00';
+    worksheet.getCell(`A${currentRow}`).value = 'Sub Total (Per Month)';
+    worksheet.getCell(`A${currentRow}`).font = { bold: true };
+    worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center' };
+    worksheet.getCell(`I${currentRow}`).value = { formula: `SUM(I15:I${lastDataRow})` };
+    worksheet.getCell(`I${currentRow}`).font = { bold: true };
+    worksheet.getCell(`I${currentRow}`).numFmt = '#,##0.00';
+    worksheet.getRow(currentRow).eachCell((cell) => { cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} }; });
+    currentRow++;
 
-    // Send the file back to the browser
+    // Special Notes / VAT rows
+    const noteStartRow = currentRow;
+    const noteEndRow = currentRow + 3;
+
+    worksheet.mergeCells(`A${noteStartRow}:F${noteEndRow}`);
+    const noteCell = worksheet.getCell(`A${noteStartRow}`);
+    noteCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B050' } };
+    noteCell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+    noteCell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+    
+    // Rich Text to color only the last point red
+    noteCell.value = {
+        richText: [
+            { font: { bold: true, color: { argb: 'FFFFFFFF' } }, text: 'Special Note\n' },
+            { font: { color: { argb: 'FFFFFFFF' } }, text: '(i) 1 OCPU is equivalent to 2 VCPU\n(ii) Boot Storage price is 20 taka per GB, Block Storage(High performance) price is 25 taka per GB\n(iii) Object Storage & Backup Stoage price is 12 taka per GB, All types of storage is NVMe disk.\n(iv) Regular BOQ prepared based on EC provided current infrastructure capacity with 80% utilization rate at 12K RPS\n(v) Given that resources in the Bangladesh Government Cloud (BGC) can be escalated at any time, BDCCL recommends initiating operations with the minimum requirements and expanding as necessary.\n' },
+            { font: { color: { argb: 'FFFF0000' }, bold: true }, text: '(vi) The use of a Web Application Firewall (WAF) is strongly recommended by BDCCL. In the event of any malicious activity occurring without the implementation of BDCCL’s WAF, BDCCL shall not be held responsible for any resulting security vulnerabilities or incidents.' }
+        ]
+    };
+
+    // Subtotal of Prod
+    worksheet.mergeCells(`G${noteStartRow}:H${noteStartRow}`);
+    worksheet.getCell(`G${noteStartRow}`).value = 'Subtotal of Prod (Per Month)';
+    worksheet.getCell(`I${noteStartRow}`).value = { formula: `I${lastDataRow + 1}` }; // Points to Sub Total
+    worksheet.getCell(`I${noteStartRow}`).numFmt = '#,##0.00';
+    
+    // VAT Rate
+    worksheet.mergeCells(`G${noteStartRow + 1}:H${noteStartRow + 1}`);
+    worksheet.getCell(`G${noteStartRow + 1}`).value = 'VAT Rate';
+    worksheet.getCell(`I${noteStartRow + 1}`).value = 0.05;
+    
+    // VAT calculation
+    worksheet.mergeCells(`G${noteStartRow + 2}:H${noteStartRow + 2}`);
+    worksheet.getCell(`G${noteStartRow + 2}`).value = 'VAT';
+    worksheet.getCell(`I${noteStartRow + 2}`).value = { formula: `I${noteStartRow}*I${noteStartRow + 1}` };
+    worksheet.getCell(`I${noteStartRow + 2}`).numFmt = '#,##0.00';
+
+    // Total Grand
+    worksheet.getCell(`G${noteStartRow + 3}`).value = 'Total (Per Month)';
+    worksheet.getCell(`G${noteStartRow + 3}`).font = { bold: true };
+    worksheet.getCell(`H${noteStartRow + 3}`).value = 'BDT';
+    worksheet.getCell(`H${noteStartRow + 3}`).font = { bold: true };
+    worksheet.getCell(`H${noteStartRow + 3}`).alignment = { horizontal: 'center' };
+    worksheet.getCell(`I${noteStartRow + 3}`).value = { formula: `I${noteStartRow}+I${noteStartRow + 2}` };
+    worksheet.getCell(`I${noteStartRow + 3}`).font = { bold: true };
+    worksheet.getCell(`I${noteStartRow + 3}`).numFmt = '#,##0.00';
+
+    // Apply borders to VAT block
+    for(let r = noteStartRow; r <= noteEndRow; r++) {
+        worksheet.getRow(r).eachCell((cell) => { cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} }; });
+    }
+
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="Generated_BOQ.xlsx"');
 
     await workbook.xlsx.write(res);
     res.end();
 });
+
 
 // --- 6. SERVE REACT FRONTEND ---
 const frontendPath = path.join(__dirname, '../boq-frontend/dist');
