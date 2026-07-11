@@ -37,6 +37,34 @@ const CUSTOM_METRIC_OPTIONS = [
   { label: "Block Storage (GB)", value: "Block Storage (GB)" }
 ];
 
+// Custom Number to Words Converter (BDT Format: Lakh, Crore)
+const toWordsBDT = (number) => {
+  const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+  const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+  const convert = (num) => {
+      if ((num = num.toString()).length > 9) return 'Overflow';
+      let n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+      if (!n) return '';
+      let str = '';
+      str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + ' Crore ' : '';
+      str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + ' Lakh ' : '';
+      str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + ' Thousand ' : '';
+      str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + ' Hundred ' : '';
+      str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
+      return str.trim();
+  };
+
+  const num = Number(number);
+  if (num === 0) return 'Zero Taka Only';
+  const split = num.toFixed(2).split('.');
+  const taka = parseInt(split[0], 10);
+  const paisa = parseInt(split[1], 10);
+  
+  let res = taka > 0 ? convert(taka) + ' Taka' : '';
+  if (paisa > 0) res += (res ? ' and ' : '') + convert(paisa) + ' Paisa';
+  return res + ' Only';
+};
+
 function App() {
   const [orgName, setOrgName] = useState('');
   const [catalog, setCatalog] = useState([]);
@@ -47,7 +75,6 @@ function App() {
   ]);
 
   useEffect(() => {
-    // Generate accurate local date for the system
     const d = new Date();
     const localDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     setTodayDate(localDate);
@@ -89,7 +116,6 @@ function App() {
       }
     }
 
-    // Isolate sub-groups by assigning a unique ID to items with different default instance quantities
     let currentSubGroupId = 0;
     let lastI = null;
 
@@ -152,7 +178,6 @@ function App() {
 
   const updateItem = (id, field, value) => setLineItems(lineItems.map(item => item.id === id ? { ...item, [field]: value } : item));
 
-  // Updates instanceQty for ALL items sharing the exact same sub-group block
   const updateSubGroupInstQty = (subGroupId, newQty) => {
     setLineItems(lineItems.map(item => item.subGroupId === subGroupId ? { ...item, instanceQty: newQty } : item));
   };
@@ -173,6 +198,7 @@ function App() {
   
   const vat = subTotal * 0.05;
   const grandTotal = subTotal + vat;
+  const hasActiveItems = lineItems.some(item => !item.isPending);
 
   const handleGenerateBoQ = async () => {
     if (!orgName.trim()) return alert("Organization Name is mandatory.");
@@ -197,51 +223,35 @@ function App() {
     <div className="app-container">
       
       <div className="brand-header">
-        <div className="brand-logo-text" style={{ fontSize: '1.8rem' }}>Bangladesh Data Center Company Limited (BDCCL)</div>
-        <p className="brand-subtext">Address: E-14/X, ICT Tower (11th Floor), Agargaon, Dhaka-1207 | Phone: +88-02-55006441</p>
+        <div className="brand-logo-text" style={{ fontSize: '1.8rem', fontWeight: 'normal' }}>Bangladesh Data Center Company Limited (BDCCL)</div>
+        <p className="brand-subtext" style={{ fontWeight: 'normal' }}>Address: E-14/X, ICT Tower (11th Floor), Agargaon, Dhaka-1207 | Phone: +88-02-55006441</p>
       </div>
 
       <div className="control-panel" style={{ marginBottom: '20px' }}>
         <div style={{ flex: '1', minWidth: '300px' }}>
-          <label className="input-label">Organization Name <span style={{color: 'red'}}>*</span></label>
-          <input type="text" className="text-input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="e.g., Department of Shipping" />
+          <label className="input-label" style={{ fontWeight: 'normal' }}>Organization Name <span style={{color: 'red'}}>*</span></label>
+          <input type="text" className="text-input" style={{ fontWeight: 'normal' }} value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="e.g., Department of Shipping" />
         </div>
         <div style={{ width: '200px' }}>
-          <label className="input-label">Date</label>
-          <input type="text" className="text-input" value={todayDate} disabled style={{ background: '#f8fafc' }} />
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', alignItems: 'center' }}>
-        <div style={{ flex: '1', maxWidth: '400px' }}>
-          <select 
-            className="text-input" 
-            style={{ fontWeight: 'bold', cursor: 'pointer', height: '42px', color: '#164e50' }}
-            onChange={(e) => { handleAddPredefinedService(e.target.value); e.target.value = ""; }}
-            defaultValue=""
-          >
-            <option value="" disabled>Select a service to add...</option>
-            {Object.keys(PREDEFINED_SERVICES).map(service => (
-              <option key={service} value={service}>{service}</option>
-            ))}
-          </select>
+          <label className="input-label" style={{ fontWeight: 'normal' }}>Date</label>
+          <input type="text" className="text-input" value={todayDate} disabled style={{ background: '#f8fafc', fontWeight: 'normal' }} />
         </div>
       </div>
 
       <div className="server-card" style={{ overflowX: 'auto', marginBottom: '20px' }}>
-        <table className="metric-table" style={{ minWidth: '1100px', borderCollapse: 'collapse' }}>
+        <table className="metric-table" style={{ minWidth: '1250px', borderCollapse: 'collapse', width: '100%' }}>
           <thead style={{ background: 'var(--teal-dark)', color: 'white' }}>
             <tr>
-              <th style={{ color: 'white', padding: '15px', border: '1px solid #333', width: '90px' }}>SL No.</th>
-              <th style={{ color: 'white', border: '1px solid #333', width: '20%' }}>Service Name</th>
-              <th style={{ color: 'white', border: '1px solid #333', width: '80px' }}>Inst Qty</th>
-              <th style={{ color: 'white', width: '30%', border: '1px solid #333' }}>Requirements/Metric</th>
-              <th style={{ color: 'white', border: '1px solid #333' }}>Part Qty</th>
-              <th style={{ color: 'white', background: '#2c6b6d', border: '1px solid #333' }}>Req Qty</th>
-              <th style={{ color: 'white', border: '1px solid #333' }}>Usage Hrs</th>
-              <th style={{ color: 'white', border: '1px solid #333' }}>Unit Price</th>
-              <th style={{ color: 'white', background: '#1a5456', border: '1px solid #333' }}>Total (BDT)</th>
-              <th style={{ border: '1px solid #333', width: '60px' }}>Action</th>
+              <th style={{ color: 'white', padding: '15px', border: '1px solid #333', width: '9%' }}>SL No.</th>
+              <th style={{ color: 'white', border: '1px solid #333', width: '22%' }}>Service Name</th>
+              <th style={{ color: 'white', border: '1px solid #333', width: '8%' }}>Inst Qty</th>
+              <th style={{ color: 'white', border: '1px solid #333', width: '28%' }}>Requirements/Metric</th>
+              <th style={{ color: 'white', border: '1px solid #333', width: '9%' }}>Part Qty</th>
+              <th style={{ color: 'white', background: '#2c6b6d', border: '1px solid #333', width: '7%' }}>Req Qty</th>
+              <th style={{ color: 'white', border: '1px solid #333', width: '7%' }}>Usage Hrs</th>
+              <th style={{ color: 'white', border: '1px solid #333', width: '9%' }}>Unit Price</th>
+              <th style={{ color: 'white', background: '#1a5456', border: '1px solid #333', width: '10%' }}>Total (BDT)</th>
+              <th style={{ border: '1px solid #333', width: '5%' }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -251,10 +261,11 @@ function App() {
                 return (
                   <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
                     <td style={{ verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'center' }}>
-                      <input type="text" className="text-input" style={{ width: '100%', padding: '6px', textAlign: 'center', background: 'transparent' }} value={item.reqGroup} disabled />
+                      <input type="text" className="text-input" style={{ width: '100%', padding: '6px', textAlign: 'center', background: 'transparent', fontWeight: 'normal' }} value={item.reqGroup} disabled />
                     </td>
+                    {/* Select box kept STRICTLY in the Service Name column (colSpan=1 instead of 3) */}
                     <td style={{ verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0' }}>
-                      <select className="text-input" style={{ fontWeight: 'bold', cursor: 'pointer', height: '36px', width: '100%' }} onChange={(e) => handleAddPredefinedService(e.target.value, item.groupId)} defaultValue="">
+                      <select className="text-input" style={{ fontWeight: 'normal', cursor: 'pointer', height: '36px', width: '100%' }} onChange={(e) => handleAddPredefinedService(e.target.value, item.groupId)} defaultValue="">
                         <option value="" disabled>Select a service to add...</option>
                         {Object.keys(PREDEFINED_SERVICES).map(service => (<option key={service} value={service}>{service}</option>))}
                       </select>
@@ -265,26 +276,31 @@ function App() {
                 );
               }
 
-              const masterItem = lineItems.find(i => i.groupId === item.groupId && i.isMaster) || item;
               const groupItems = lineItems.filter(i => i.groupId === item.groupId);
+              const masterItem = groupItems.find(i => i.isMaster) || item;
               const isLastInGroup = index === lineItems.length - 1 || lineItems[index + 1].groupId !== item.groupId;
               
               const isBastionOrCompute = masterItem.serverName.includes('Bastion') || masterItem.serverName.includes('Compute Instance');
               
-              // Calculate Sub-Group Instance Qty Merging
+              const hasAddMoreRow = isBastionOrCompute;
+              const masterRowSpan = groupItems.length + (hasAddMoreRow ? 1 : 0);
+
               let showInstQty = false;
               let instRowSpan = 1;
+              
               if (index === 0 || lineItems[index - 1].subGroupId !== item.subGroupId) {
                 showInstQty = true;
                 for (let i = index + 1; i < lineItems.length; i++) {
                   if (lineItems[i].subGroupId === item.subGroupId) instRowSpan++;
                   else break;
                 }
-                // If this sub-group touches the end of a Bastion/Compute group, extend the merge down to cover the Add Metric row
-                if (isBastionOrCompute && lineItems.slice(index, index + instRowSpan).some(i => i.groupId !== lineItems[Math.min(lineItems.length - 1, index + instRowSpan)]?.groupId)) {
-                  instRowSpan++;
-                }
+                const lastIndexInSubGroup = index + instRowSpan - 1;
+                const isLastInGroupForInst = lastIndexInSubGroup === lineItems.length - 1 || lineItems[lastIndexInSubGroup + 1].groupId !== item.groupId;
+                if (isLastInGroupForInst && hasAddMoreRow) instRowSpan++;
               }
+
+              const mandatoryCount = groupItems.filter(i => i.isMandatory).length;
+              const actionRowSpan = Math.max(1, mandatoryCount);
 
               const hasPublicIP = groupItems.some(i => i.metricName === 'Public IP');
               const dynamicOptions = hasPublicIP ? CUSTOM_METRIC_OPTIONS.filter(o => o.value !== 'Public IP') : CUSTOM_METRIC_OPTIONS;
@@ -293,54 +309,68 @@ function App() {
 
               return (
                 <React.Fragment key={item.id}>
-                  <tr style={{ borderBottom: isLastInGroup && (!isBastionOrCompute) ? '1px solid #e2e8f0' : '1px solid #e2e8f0' }}>
+                  <tr style={{ borderBottom: isLastInGroup && !hasAddMoreRow ? '2px solid #cbd5e1' : '1px solid #e2e8f0' }}>
                     
                     {item.isMaster && (
                       <>
-                        <td rowSpan={groupItems.length + (isLastInGroup && isBastionOrCompute ? 1 : 0)} style={{ background: '#f1f5f9', verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #cbd5e1', textAlign: 'center' }}>
+                        <td rowSpan={masterRowSpan} style={{ background: '#f1f5f9', verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #cbd5e1', textAlign: 'center' }}>
                           <input type="text" className="text-input" style={{ width: '100%', padding: '6px', textAlign: 'center', fontWeight: 'normal' }} value={item.reqGroup} onChange={(e) => updateItem(item.id, 'reqGroup', e.target.value)} placeholder="Req." />
                         </td>
-                        <td rowSpan={groupItems.length + (isLastInGroup && isBastionOrCompute ? 1 : 0)} style={{ background: '#f1f5f9', verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #cbd5e1' }}>
-                          <input type="text" className="text-input" style={{ padding: '6px', fontWeight: 'bold', width: '100%' }} value={item.serverName} onChange={(e) => updateItem(item.id, 'serverName', e.target.value)} />
+                        <td rowSpan={masterRowSpan} style={{ background: '#f1f5f9', verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #cbd5e1' }}>
+                          {/* Dynamic rows for textarea to snap tightly without huge whitespace */}
+                          <textarea 
+                            className="text-input" 
+                            rows={item.serverName.length > 25 ? 2 : 1}
+                            style={{ padding: '6px', fontWeight: 'normal', width: '100%', resize: 'none', minHeight: '36px', height: 'auto', fontFamily: 'inherit', lineHeight: '1.4', overflow: 'hidden' }} 
+                            value={item.serverName} 
+                            onChange={(e) => updateItem(item.id, 'serverName', e.target.value)} 
+                          />
                         </td>
                       </>
                     )}
                     
                     {showInstQty && (
-                      <td rowSpan={isLastInGroup && isBastionOrCompute ? instRowSpan + 1 : instRowSpan} style={{ background: '#f1f5f9', verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'center' }}>
-                        <input type="number" className="text-input" style={{ padding: '6px', width: '100%', minWidth: '50px', textAlign: 'center', fontWeight: 'bold' }} value={item.instanceQty} onChange={(e) => updateSubGroupInstQty(item.subGroupId, e.target.value)} min="1" />
+                      <td rowSpan={instRowSpan} style={{ background: '#f1f5f9', verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'center' }}>
+                        <input type="number" className="text-input" style={{ padding: '6px', width: '100%', minWidth: '50px', textAlign: 'center', fontWeight: 'normal' }} value={item.instanceQty} onChange={(e) => updateSubGroupInstQty(item.subGroupId, e.target.value)} min="1" />
                       </td>
                     )}
                     
                     <td style={{ padding: '10px', borderRight: '1px solid #e2e8f0' }}>
                       {!item.isCustom ? (
-                        <div style={{ fontWeight: '500', fontSize: '0.85rem', color: '#1e293b' }}>{item.metricName}</div>
+                        <div style={{ fontWeight: 'normal', fontSize: '0.85rem', color: '#1e293b' }}>{item.metricName}</div>
                       ) : (
                         <Select options={dynamicOptions} value={item.metricName ? { label: item.metricName, value: item.metricName } : null} onChange={(opt) => updateItem(item.id, 'metricName', opt.value)} menuPortalTarget={document.body} placeholder="Select..." styles={{ control: base => ({ ...base, minHeight: '36px', fontSize: '0.85rem' }), menuPortal: base => ({ ...base, zIndex: 9999 }) }} />
                       )}
                     </td>
                     
-                    <td style={{ padding: '10px', borderRight: '1px solid #e2e8f0' }}><input type="number" className="text-input" style={{ padding: '6px', width: '100%' }} value={item.partQty} onChange={(e) => updateItem(item.id, 'partQty', e.target.value)} min="1" /></td>
-                    <td style={{ background: '#f8fafc', fontWeight: 'bold', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>{reqQty}</td>
-                    <td style={{ padding: '10px', borderRight: '1px solid #e2e8f0' }}><input type="number" className="text-input" style={{ padding: '6px', width: '100%' }} value={item.usageHours} onChange={(e) => updateItem(item.id, 'usageHours', e.target.value)} /></td>
-                    <td style={{ fontWeight: '500', fontSize: '0.9rem', padding: '10px', borderRight: '1px solid #e2e8f0' }}>{price.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                    <td style={{ fontWeight: '700', color: 'var(--teal-dark)', padding: '10px', borderRight: '1px solid #e2e8f0' }}>{(reqQty * price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                    <td style={{ padding: '10px', textAlign: 'center' }}>
-                      {(item.isMaster || !item.isMandatory) && (
-                        <button className="remove-btn" onClick={() => removeItem(item.id)} title={item.isMaster ? "Delete Entire Package" : "Delete Item"}><Trash2 size={16} /></button>
-                      )}
-                    </td>
+                    <td style={{ padding: '10px', borderRight: '1px solid #e2e8f0' }}><input type="number" className="text-input" style={{ padding: '6px', width: '100%', fontWeight: 'normal' }} value={item.partQty} onChange={(e) => updateItem(item.id, 'partQty', e.target.value)} min="1" /></td>
+                    <td style={{ background: '#f8fafc', fontWeight: 'normal', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>{reqQty}</td>
+                    <td style={{ padding: '10px', borderRight: '1px solid #e2e8f0' }}><input type="number" className="text-input" style={{ padding: '6px', width: '100%', fontWeight: 'normal' }} value={item.usageHours} onChange={(e) => updateItem(item.id, 'usageHours', e.target.value)} /></td>
+                    <td style={{ fontWeight: 'normal', fontSize: '0.9rem', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'right' }}>{price.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td style={{ fontWeight: 'normal', color: 'var(--teal-dark)', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'right' }}>{(reqQty * price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    
+                    {item.isMaster ? (
+                      <td rowSpan={actionRowSpan} style={{ padding: '10px', textAlign: 'center', verticalAlign: 'middle', borderRight: '1px solid #e2e8f0' }}>
+                        <button className="remove-btn" onClick={() => removeItem(item.id)} title="Delete Entire Package"><Trash2 size={18} /></button>
+                      </td>
+                    ) : (
+                      !item.isMandatory && (
+                        <td style={{ padding: '10px', textAlign: 'center', verticalAlign: 'middle', borderRight: '1px solid #e2e8f0' }}>
+                          <button className="remove-btn" onClick={() => removeItem(item.id)} title="Delete Item"><Trash2 size={16} /></button>
+                        </td>
+                      )
+                    )}
                   </tr>
 
-                  {/* Render the Add Metric Button DIRECTLY UNDER the Metric Column */}
-                  {isLastInGroup && isBastionOrCompute && (
+                  {isLastInGroup && hasAddMoreRow && (
                     <tr key={`add-more-row-${item.groupId}`} style={{ borderBottom: '2px solid #cbd5e1' }}>
                       <td style={{ padding: '8px 12px', background: '#fafafa', borderRight: '1px solid #e2e8f0', textAlign: 'left' }}>
-                        <button onClick={() => addSubItemToGroup(item.groupId)} style={{ background: 'transparent', color: 'var(--teal-main)', border: '1px dashed var(--teal-main)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <button onClick={() => addSubItemToGroup(item.groupId)} style={{ background: 'transparent', color: 'var(--teal-main)', border: '1px dashed var(--teal-main)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'normal', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <Plus size={14} /> Add other metric
                         </button>
                       </td>
-                      <td colSpan="6" style={{ background: '#fafafa', borderRight: '1px solid #e2e8f0' }}></td>
+                      <td colSpan="5" style={{ background: '#fafafa', borderRight: '1px solid #e2e8f0' }}></td>
+                      <td style={{ background: '#fafafa' }}></td>
                     </tr>
                   )}
                 </React.Fragment>
@@ -349,40 +379,55 @@ function App() {
             
             <tr>
               <td colSpan="10" style={{ padding: '15px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
-                <button onClick={addPendingRequirementRow} style={{ background: '#164e50', color: 'white', border: 'none', padding: '8px 18px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                <button onClick={addPendingRequirementRow} style={{ background: '#164e50', color: 'white', border: 'none', padding: '8px 18px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 'normal', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                   <Plus size={16} /> Add new requirement
                 </button>
               </td>
             </tr>
 
-            {/* --- WEB UI BILLING CALCULATION (Special Notes Hidden) --- */}
-            <tr>
-              <td colSpan="6" style={{ background: 'transparent', border: 'none' }}></td>
-              <td colSpan="2" style={{ fontWeight: 'bold', padding: '10px', border: '1px solid #333', textAlign: 'right', background: '#f8fafc' }}>Subtotal of Prod (Per Month)</td>
-              <td colSpan="2" style={{ fontWeight: 'bold', padding: '10px', border: '1px solid #333', textAlign: 'right', background: '#f8fafc' }}>{subTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-            </tr>
-            <tr>
-              <td colSpan="6" style={{ background: 'transparent', border: 'none' }}></td>
-              <td colSpan="2" style={{ padding: '10px', border: '1px solid #333', textAlign: 'right', background: '#f8fafc' }}>VAT Rate</td>
-              <td colSpan="2" style={{ padding: '10px', border: '1px solid #333', textAlign: 'right', background: '#f8fafc' }}>0.05</td>
-            </tr>
-            <tr>
-              <td colSpan="6" style={{ background: 'transparent', border: 'none' }}></td>
-              <td colSpan="2" style={{ padding: '10px', border: '1px solid #333', textAlign: 'right', background: '#f8fafc' }}>VAT</td>
-              <td colSpan="2" style={{ padding: '10px', border: '1px solid #333', textAlign: 'right', background: '#f8fafc' }}>{vat.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-            </tr>
-            <tr>
-              <td colSpan="6" style={{ background: 'transparent', border: 'none' }}></td>
-              <td colSpan="1" style={{ fontWeight: 'bold', padding: '10px', border: '1px solid #333', textAlign: 'right', background: '#f8fafc', fontSize: '1.1rem' }}>Total (Per Month)</td>
-              <td colSpan="1" style={{ fontWeight: 'bold', padding: '10px', border: '1px solid #333', textAlign: 'center', background: '#f8fafc', fontSize: '1.1rem' }}>BDT</td>
-              <td colSpan="2" style={{ fontWeight: 'bold', padding: '10px', border: '1px solid #333', textAlign: 'right', background: '#f8fafc', fontSize: '1.1rem' }}>{grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-            </tr>
+            {/* --- FLATTENED & CONDITIONAL WEB UI BILLING CALCULATION --- */}
+            {hasActiveItems && (
+              <>
+                <tr>
+                  <td colSpan="5" style={{ background: 'transparent', border: 'none' }}></td>
+                  <td colSpan="3" style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>Subtotal (Per Month)</td>
+                  <td style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>{subTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                  <td style={{ background: 'transparent', border: 'none' }}></td>
+                </tr>
+                <tr>
+                  <td colSpan="5" style={{ background: 'transparent', border: 'none' }}></td>
+                  <td colSpan="3" style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>VAT Rate</td>
+                  <td style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>0.05</td>
+                  <td style={{ background: 'transparent', border: 'none' }}></td>
+                </tr>
+                <tr>
+                  <td colSpan="5" style={{ background: 'transparent', border: 'none' }}></td>
+                  <td colSpan="3" style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>VAT</td>
+                  <td style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>{vat.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                  <td style={{ background: 'transparent', border: 'none' }}></td>
+                </tr>
+                <tr>
+                  <td colSpan="5" style={{ background: 'transparent', border: 'none' }}></td>
+                  <td colSpan="2" style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc', fontSize: '1.05rem' }}>Total (Per Month)</td>
+                  <td style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'center', background: '#f8fafc', fontSize: '1.05rem' }}>BDT</td>
+                  <td style={{ fontWeight: 'bold', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc', fontSize: '1.05rem', color: 'var(--teal-dark)' }}>{grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                  <td style={{ background: 'transparent', border: 'none' }}></td>
+                </tr>
+                <tr>
+                  <td colSpan="9" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '15px', textAlign: 'left' }}>
+                    <span style={{ fontWeight: 'bold', color: '#1e293b' }}>In Words: </span>
+                    <span style={{ fontStyle: 'italic', color: '#475569' }}>{toWordsBDT(grandTotal)}</span>
+                  </td>
+                  <td style={{ background: 'transparent', border: 'none' }}></td>
+                </tr>
+              </>
+            )}
           </tbody>
         </table>
       </div>
 
       <div style={{ textAlign: 'center', marginTop: '30px', marginBottom: '40px' }}>
-        <button className="btn btn-gold" onClick={handleGenerateBoQ} style={{ height: '50px', fontSize: '1.1rem', padding: '0 30px' }}>
+        <button className="btn btn-gold" onClick={handleGenerateBoQ} style={{ height: '50px', fontSize: '1.1rem', padding: '0 30px', fontWeight: 'normal' }}>
           <FileSpreadsheet size={22} style={{marginRight: '10px'}}/> Generate Excel Output
         </button>
       </div>

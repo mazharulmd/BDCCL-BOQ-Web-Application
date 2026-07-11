@@ -8,6 +8,31 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const toWordsBDT = (number) => {
+    const a = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+    const b = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    const convert = (num) => {
+        if ((num = num.toString()).length > 9) return 'Overflow';
+        let n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+        if (!n) return '';
+        let str = '';
+        str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + ' Crore ' : '';
+        str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + ' Lakh ' : '';
+        str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + ' Thousand ' : '';
+        str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + ' Hundred ' : '';
+        str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
+        return str.trim();
+    };
+    const num = Number(number);
+    if (num === 0) return 'Zero Taka Only';
+    const split = num.toFixed(2).split('.');
+    const taka = parseInt(split[0], 10);
+    const paisa = parseInt(split[1], 10);
+    let res = taka > 0 ? convert(taka) + ' Taka' : '';
+    if (paisa > 0) res += (res ? ' and ' : '') + convert(paisa) + ' Paisa';
+    return res + ' Only';
+};
+
 // --- 1. DATABASE CONNECTION ---
 const pool = new Pool({
     user: 'boq_user',
@@ -210,31 +235,78 @@ app.post('/api/quotes/generate', async (req, res) => {
         
         currentRow++;
     });
-    // --- VAT & SPECIAL NOTES BLOCK ---
+
+// --- VAT & SPECIAL NOTES BLOCK ---
     const lastDataRow = currentRow - 1;
+    let rowOffset = currentRow;
 
-    // Subtotal Row
-    worksheet.mergeCells(`A${currentRow}:H${currentRow}`);
-    worksheet.getCell(`A${currentRow}`).value = 'Sub Total (Per Month)';
-    worksheet.getCell(`A${currentRow}`).font = { bold: true };
-    worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center' };
-    worksheet.getCell(`I${currentRow}`).value = { formula: `SUM(I15:I${lastDataRow})` };
-    worksheet.getCell(`I${currentRow}`).font = { bold: true };
-    worksheet.getCell(`I${currentRow}`).numFmt = '#,##0.00';
-    worksheet.getRow(currentRow).eachCell((cell) => { cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} }; });
-    currentRow++;
+    // Subtotal (Aligned to Col F-G and H, Value in I)
+    worksheet.mergeCells(`F${rowOffset}:H${rowOffset}`);
+    worksheet.getCell(`F${rowOffset}`).value = 'Subtotal (Per Month)';
+    worksheet.getCell(`F${rowOffset}`).font = { bold: false };
+    worksheet.getCell(`F${rowOffset}`).alignment = { horizontal: 'right' };
+    worksheet.getCell(`I${rowOffset}`).value = { formula: `SUM(I15:I${lastDataRow})` };
+    worksheet.getCell(`I${rowOffset}`).font = { bold: false };
+    worksheet.getCell(`I${rowOffset}`).numFmt = '#,##0.00';
+    rowOffset++;
+    
+    // VAT Rate
+    worksheet.mergeCells(`F${rowOffset}:H${rowOffset}`);
+    worksheet.getCell(`F${rowOffset}`).value = 'VAT Rate';
+    worksheet.getCell(`F${rowOffset}`).alignment = { horizontal: 'right' };
+    worksheet.getCell(`I${rowOffset}`).value = 0.05;
+    rowOffset++;
+    
+    // VAT Calculation
+    worksheet.mergeCells(`F${rowOffset}:H${rowOffset}`);
+    worksheet.getCell(`F${rowOffset}`).value = 'VAT';
+    worksheet.getCell(`F${rowOffset}`).alignment = { horizontal: 'right' };
+    worksheet.getCell(`I${rowOffset}`).value = { formula: `I${rowOffset-2}*I${rowOffset-1}` };
+    worksheet.getCell(`I${rowOffset}`).numFmt = '#,##0.00';
+    rowOffset++;
 
-    // Special Notes / VAT rows
-    const noteStartRow = currentRow;
-    const noteEndRow = currentRow + 3;
+    // Total Grand
+    worksheet.mergeCells(`F${rowOffset}:G${rowOffset}`);
+    worksheet.getCell(`F${rowOffset}`).value = 'Total (Per Month)';
+    worksheet.getCell(`F${rowOffset}`).font = { bold: true };
+    worksheet.getCell(`F${rowOffset}`).alignment = { horizontal: 'right' };
+    
+    worksheet.getCell(`H${rowOffset}`).value = 'BDT';
+    worksheet.getCell(`H${rowOffset}`).font = { bold: true };
+    worksheet.getCell(`H${rowOffset}`).alignment = { horizontal: 'center' };
+    
+    worksheet.getCell(`I${rowOffset}`).value = { formula: `I${rowOffset-3}+I${rowOffset-1}` };
+    worksheet.getCell(`I${rowOffset}`).font = { bold: true };
+    worksheet.getCell(`I${rowOffset}`).numFmt = '#,##0.00';
+    rowOffset++;
 
-    worksheet.mergeCells(`A${noteStartRow}:F${noteEndRow}`);
-    const noteCell = worksheet.getCell(`A${noteStartRow}`);
+    // Apply strict borders to the calculation block
+    for(let r = currentRow; r < rowOffset; r++) {
+        worksheet.getRow(r).eachCell((cell) => { cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} }; });
+    }
+
+    // In Words Row (Now positioned AFTER the Total)
+    worksheet.mergeCells(`A${rowOffset}:I${rowOffset}`);
+    const wordsCell = worksheet.getCell(`A${rowOffset}`);
+    
+    let rawSubTotal = 0;
+    lineItems.forEach(item => { rawSubTotal += (Number(item.instanceQty) * Number(item.partQty) * Number(item.unitPrice || 0)); });
+    const calculatedGrandTotal = rawSubTotal * 1.05;
+    
+    wordsCell.value = 'In Words: ' + toWordsBDT(calculatedGrandTotal);
+    wordsCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    wordsCell.font = { italic: true, bold: true };
+    wordsCell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+    
+    rowOffset += 2; // Add a visual gap before special notes
+
+    // Special Notes Box
+    const noteEndRow = rowOffset + 3;
+    worksheet.mergeCells(`A${rowOffset}:I${noteEndRow}`);
+    const noteCell = worksheet.getCell(`A${rowOffset}`);
     noteCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00B050' } };
     noteCell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
     noteCell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
-    
-    // Rich Text to color only the last point red
     noteCell.value = {
         richText: [
             { font: { bold: true, color: { argb: 'FFFFFFFF' } }, text: 'Special Note\n' },
@@ -243,45 +315,12 @@ app.post('/api/quotes/generate', async (req, res) => {
         ]
     };
 
-    // Subtotal of Prod
-    worksheet.mergeCells(`G${noteStartRow}:H${noteStartRow}`);
-    worksheet.getCell(`G${noteStartRow}`).value = 'Subtotal of Prod (Per Month)';
-    worksheet.getCell(`I${noteStartRow}`).value = { formula: `I${lastDataRow + 1}` }; // Points to Sub Total
-    worksheet.getCell(`I${noteStartRow}`).numFmt = '#,##0.00';
-    
-    // VAT Rate
-    worksheet.mergeCells(`G${noteStartRow + 1}:H${noteStartRow + 1}`);
-    worksheet.getCell(`G${noteStartRow + 1}`).value = 'VAT Rate';
-    worksheet.getCell(`I${noteStartRow + 1}`).value = 0.05;
-    
-    // VAT calculation
-    worksheet.mergeCells(`G${noteStartRow + 2}:H${noteStartRow + 2}`);
-    worksheet.getCell(`G${noteStartRow + 2}`).value = 'VAT';
-    worksheet.getCell(`I${noteStartRow + 2}`).value = { formula: `I${noteStartRow}*I${noteStartRow + 1}` };
-    worksheet.getCell(`I${noteStartRow + 2}`).numFmt = '#,##0.00';
-
-    // Total Grand
-    worksheet.getCell(`G${noteStartRow + 3}`).value = 'Total (Per Month)';
-    worksheet.getCell(`G${noteStartRow + 3}`).font = { bold: true };
-    worksheet.getCell(`H${noteStartRow + 3}`).value = 'BDT';
-    worksheet.getCell(`H${noteStartRow + 3}`).font = { bold: true };
-    worksheet.getCell(`H${noteStartRow + 3}`).alignment = { horizontal: 'center' };
-    worksheet.getCell(`I${noteStartRow + 3}`).value = { formula: `I${noteStartRow}+I${noteStartRow + 2}` };
-    worksheet.getCell(`I${noteStartRow + 3}`).font = { bold: true };
-    worksheet.getCell(`I${noteStartRow + 3}`).numFmt = '#,##0.00';
-
-    // Apply borders to VAT block
-    for(let r = noteStartRow; r <= noteEndRow; r++) {
-        worksheet.getRow(r).eachCell((cell) => { cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} }; });
-    }
-
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="Generated_BOQ.xlsx"');
 
     await workbook.xlsx.write(res);
     res.end();
 });
-
 
 // --- 6. SERVE REACT FRONTEND ---
 const frontendPath = path.join(__dirname, '../boq-frontend/dist');
