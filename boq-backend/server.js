@@ -34,26 +34,35 @@ const toWordsBDT = (number) => {
 };
 
 // --- 1. DATABASE CONNECTION ---
+// Creds read from env. Fallbacks keep existing setup working.
+// Set in shell / PM2 ecosystem / .env-loader: PGUSER PGHOST PGDATABASE PGPASSWORD PGPORT
 const pool = new Pool({
-    user: 'boq_user',
-    host: 'localhost',
-    database: 'boq_db',
-    password: 'Admin@1324', // Your secure password
-    port: 5432,
+    user: process.env.PGUSER || 'boq_user',
+    host: process.env.PGHOST || 'localhost',
+    database: process.env.PGDATABASE || 'boq_db',
+    password: process.env.PGPASSWORD || 'Admin@1324',
+    port: Number(process.env.PGPORT) || 5432,
 });
 
 // --- 2. DATABASE INITIALIZATION & SEEDING ---
 async function initializeDatabase() {
     try {
-        await pool.query('DROP TABLE IF EXISTS product_catalog;');
+        // Non-destructive: table kept across restarts so runtime price edits survive.
         await pool.query(`
-            CREATE TABLE product_catalog (
+            CREATE TABLE IF NOT EXISTS product_catalog (
                 id SERIAL PRIMARY KEY,
-                metric_name VARCHAR(255),
+                metric_name VARCHAR(255) UNIQUE,
                 unit_price_bdt NUMERIC
             );
         `);
-        
+
+        // Seed only when empty. Existing rows never overwritten.
+        const { rows } = await pool.query('SELECT COUNT(*)::int AS c FROM product_catalog');
+        if (rows[0].c > 0) {
+            console.log(`Catalog already has ${rows[0].c} rows. Skipping seed.`);
+            return;
+        }
+
         await pool.query(`
             INSERT INTO product_catalog (metric_name, unit_price_bdt) VALUES
             ('Compute E4 Standard - OCPU', 2168.0),
@@ -99,7 +108,8 @@ async function initializeDatabase() {
             ('Site to site GRE over IPsec VPN over private data connectivity', 10000.0),
             ('Set up (one time cost)', 10000.0),
             ('FastConnect 1 Gbps (Port Month)', 19111.0),
-            ('Data Connectivity Bandwidth (Per 10 Mbps)', 2500.0);
+            ('Data Connectivity Bandwidth (Per 10 Mbps)', 2500.0)
+            ON CONFLICT (metric_name) DO NOTHING;
         `);
         console.log("Database seeded successfully with DOS BOQ catalog.");
     } catch (err) {
@@ -108,6 +118,31 @@ async function initializeDatabase() {
 }
 initializeDatabase();
 
+
+// --- HEALTH CHECK ---
+app.get('/api/health', async (req, res) => {
+    try {
+        await pool.query('SELECT 1');
+        res.json({ status: 'ok', db: 'connected' });
+    } catch (err) {
+        res.status(503).json({ status: 'down', error: err.message });
+    }
+});
+
+// --- API: UPDATE A UNIT PRICE (survives restart now) ---
+app.put('/api/products/:id', async (req, res) => {
+    const { unit_price_bdt } = req.body;
+    try {
+        const result = await pool.query(
+            'UPDATE product_catalog SET unit_price_bdt = $1 WHERE id = $2 RETURNING *',
+            [unit_price_bdt, req.params.id]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // --- 3. API: FETCH FULL CATALOG ---
 app.get('/api/products', async (req, res) => {
@@ -330,5 +365,5 @@ app.use((req, res) => {
 });
 
 // --- START SERVER ---
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, () => console.log(`Backend API running on port ${PORT}`));

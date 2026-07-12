@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Select from 'react-select';
 import axios from 'axios';
-import { Plus, Trash2, FileSpreadsheet } from 'lucide-react';
-import './App.css';
+import { Plus, Trash2, FileSpreadsheet, CheckCircle2, AlertTriangle, LayoutGrid, ChevronUp, ChevronDown } from 'lucide-react';
+import './index.css';
 
 // --- EXACT PREDEFINED PACKAGES ---
 const PREDEFINED_SERVICES = {
   "Bastion Server (Linux)": { items: [ { m: "Compute E4 Standard - OCPU", p: 1, u: 730, i: 1 }, { m: "Compute - E4 Standard - Memory (GB)", p: 4, u: 730, i: 1 }, { m: "Boot Storage (GB)", p: 50, u: 730, i: 1 }, { m: "Public IP", p: 1, u: 730, i: 1 } ] },
   "Bastion Server (Windows)": { items: [ { m: "Compute E4 Standard - OCPU", p: 4, u: 730, i: 1 }, { m: "Compute - E4 Standard - Memory (GB)", p: 24, u: 730, i: 1 }, { m: "Boot Storage (GB)", p: 300, u: 730, i: 1 }, { m: "Windows Operating System", p: 4, u: 730, i: 1 }, { m: "Public IP", p: 1, u: 730, i: 1 } ] },
   "Compute Instance (Linux)": { items: [ { m: "Compute - E4 Standard - OCPU", p: 8, u: 730, i: 1 }, { m: "Compute - E4 Standard - Memory (GB)", p: 16, u: 730, i: 1 }, { m: "Boot Storage (GB)", p: 200, u: 730, i: 1 } ] },
-  "Compute Instance (Windows)": { items: [ { m: "Compute E4 Standard - OCPU", p: 4, u: 730, i: 1 }, { m: "Windows Operating System", p: 4, u: 730, i: 1 }, { m: "Compute - E4 Standard - Memory (GB)", p: 24, u: 730, i: 1 }, { m: "Boot Storage (GB)", p: 300, u: 730, i: 1 } ] },
-  "Compute Instance (Windows) - Intel": { items: [ { m: "Compute X9 Standard - OCPU", p: 72, u: 730, i: 1 }, { m: "Windows Operating System", p: 72, u: 730, i: 1 }, { m: "Compute - X9 Standard - Memory (GB)", p: 256, u: 730, i: 1 }, { m: "Block Storage (GB)", p: 15360, u: 730, i: 1 }, { m: "Boot Storage (GB)", p: 512, u: 730, i: 1 } ] },
+  "Compute Instance (Windows) - AMD": { items: [ { m: "Compute E4 Standard - OCPU", p: 4, u: 730, i: 1 }, { m: "Windows Operating System", p: 4, u: 730, i: 1 }, { m: "Compute - E4 Standard - Memory (GB)", p: 24, u: 730, i: 1 }, { m: "Boot Storage (GB)", p: 300, u: 730, i: 1 } ] },
+  "Compute Instance (Windows) - Intel": { items: [ { m: "Compute X9 Standard - OCPU", p: 72, u: 730, i: 1 }, { m: "Windows Operating System", p: 72, u: 730, i: 1 }, { m: "Compute - X9 Standard - Memory (GB)", p: 256, u: 730, i: 1 }, { m: "Boot Storage (GB)", p: 512, u: 730, i: 1 } ] },
   "Backup Storage": { items: [ { m: "Block Storage (GB)", p: 10704, u: 730, i: 1 } ] },
   "Object Storage": { items: [ { m: "Object Storage - Storage (GB Capacity Per Month)", p: 500, u: 1, i: 1 }, { m: "Object Storage - Requests (10,000 Requests per Month)", p: 200, u: 1, i: 1, req: false } ] },
   "ATP Database / Autonomous Database": { items: [ { m: "Oracle Autonomous Transaction Processing (ECPU Per Hour)", p: 6, u: 730, i: 1 }, { m: "Autonomous Database Storage for Transaction Processing  (GB Per Month)", p: 500, u: 1, i: 1 }, { m: "Backup - Oracle Autonomous Database Storage (GB)", p: 1000, u: 1, i: 1 } ] },
@@ -31,6 +31,20 @@ const PREDEFINED_SERVICES = {
   "Reserved Public IP": { items: [ { m: "Public IP", p: 1, u: 730, i: 35 } ] },
   "Data Connectivity": { items: [ { m: "Data Connectivity Bandwidth (Per 10 Mbps)", p: 20, u: 1, i: 1 } ] }
 };
+
+// --- CATEGORISED PICKER (grouped, searchable) ---
+const SERVICE_CATEGORIES = [
+  { label: "Compute", services: ["Bastion Server (Linux)", "Bastion Server (Windows)", "Compute Instance (Linux)", "Compute Instance (Windows) - AMD", "Compute Instance (Windows) - Intel"] },
+  { label: "Storage", services: ["Backup Storage", "Object Storage"] },
+  { label: "Database", services: ["ATP Database / Autonomous Database", "MySQL HeatWave Database", "Oralce Base Database", "PostgreSQL Database"] },
+  { label: "Platform & Analytics", services: ["Email Delivery Service", "Monitoring dashboard", "DRCC Analytics Cloud - Enterprise", "Oracle Kubernetes Engine (OKE)", "Cache with Redis"] },
+  { label: "Security", services: ["Vulnerability Scanning Service", "Cloud Guard", "Network Firewall", "Load Balancer & WAF"] },
+  { label: "Connectivity", services: ["IPsec VPN", "FastConnect", "Reserved Public IP", "Data Connectivity"] },
+];
+const GROUPED_OPTIONS = SERVICE_CATEGORIES.map(cat => ({
+  label: cat.label,
+  options: cat.services.map(s => ({ label: s, value: s }))
+}));
 
 const CUSTOM_METRIC_OPTIONS = [
   { label: "Public IP", value: "Public IP" },
@@ -53,26 +67,42 @@ const toWordsBDT = (number) => {
       str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
       return str.trim();
   };
-
   const num = Number(number);
   if (num === 0) return 'Zero Taka Only';
   const split = num.toFixed(2).split('.');
   const taka = parseInt(split[0], 10);
   const paisa = parseInt(split[1], 10);
-  
   let res = taka > 0 ? convert(taka) + ' Taka' : '';
   if (paisa > 0) res += (res ? ' and ' : '') + convert(paisa) + ' Paisa';
   return res + ' Only';
+};
+
+const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// react-select theming to match brand
+const selectStyles = {
+  control: (base, s) => ({ ...base, minHeight: '36px', fontSize: '0.85rem', borderColor: s.isFocused ? '#248a8c' : '#e2e8f0', boxShadow: s.isFocused ? '0 0 0 3px rgba(36,138,140,.18)' : 'none', '&:hover': { borderColor: '#248a8c' } }),
+  menuPortal: base => ({ ...base, zIndex: 9999 }),
+  groupHeading: base => ({ ...base, color: '#124d4e', fontWeight: 700, fontSize: '.72rem', textTransform: 'uppercase', letterSpacing: '.4px' }),
+  option: (base, s) => ({ ...base, backgroundColor: s.isFocused ? '#e6f2f2' : '#fff', color: '#16232a', fontSize: '.85rem' }),
 };
 
 function App() {
   const [orgName, setOrgName] = useState('');
   const [catalog, setCatalog] = useState([]);
   const [todayDate, setTodayDate] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [toasts, setToasts] = useState([]);
 
   const [lineItems, setLineItems] = useState([
     { id: Date.now(), groupId: Date.now(), isPending: true, reqGroup: 'Req. 1' }
   ]);
+
+  const pushToast = useCallback((type, msg) => {
+    const id = Date.now() + Math.random();
+    setToasts(t => [...t, { id, type, msg }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3800);
+  }, []);
 
   useEffect(() => {
     const d = new Date();
@@ -85,10 +115,11 @@ function App() {
         setCatalog(response.data);
       } catch (error) {
         console.error("Error fetching catalog", error);
+        pushToast('err', 'Could not load price catalog.');
       }
     };
     fetchCatalog();
-  }, []);
+  }, [pushToast]);
 
   const getPrice = (metricName) => {
     const product = catalog.find(p => p.metric_name === metricName);
@@ -131,7 +162,7 @@ function App() {
         isMaster: index === 0,
         reqGroup: index === 0 ? currentReq : '',
         serverName: index === 0 ? serviceName : '',
-        instanceQty: item.i, 
+        instanceQty: item.i,
         metricName: item.m,
         partQty: item.p,
         usageHours: item.u,
@@ -139,9 +170,10 @@ function App() {
         isCustom: false
       };
     });
-    
+
     newItems.splice(insertIndex, 0, ...newPackage);
     setLineItems(newItems);
+    pushToast('ok', `${serviceName} added.`);
   };
 
   const addPendingRequirementRow = () => {
@@ -157,21 +189,21 @@ function App() {
     for (let i = newItems.length - 1; i >= 0; i--) {
       if (newItems[i].groupId === groupId) {
         insertIndex = i + 1;
-        inheritedInstQty = newItems[i].instanceQty; 
+        inheritedInstQty = newItems[i].instanceQty;
         inheritedSubGroupId = newItems[i].subGroupId;
         break;
       }
     }
-    
+
     newItems.splice(insertIndex, 0, {
       id: Date.now(),
       groupId: groupId,
       subGroupId: inheritedSubGroupId,
       isMaster: false,
       reqGroup: '', serverName: '',
-      instanceQty: inheritedInstQty, 
+      instanceQty: inheritedInstQty,
       metricName: '', partQty: 1, usageHours: 730,
-      isMandatory: false, isCustom: true 
+      isMandatory: false, isCustom: true
     });
     setLineItems(newItems);
   };
@@ -191,84 +223,128 @@ function App() {
     }
   };
 
+  const moveGroup = (groupId, dir) => {
+    const order = [];
+    lineItems.forEach(i => { if (!order.includes(i.groupId)) order.push(i.groupId); });
+    const idx = order.indexOf(groupId);
+    const swap = idx + dir;
+    if (swap < 0 || swap >= order.length) return;
+    [order[idx], order[swap]] = [order[swap], order[idx]];
+    let rebuilt = [];
+    order.forEach(gid => rebuilt.push(...lineItems.filter(i => i.groupId === gid)));
+    let n = 0;
+    rebuilt = rebuilt.map(i => (i.isMaster || i.isPending) ? { ...i, reqGroup: `Req. ${++n}` } : i);
+    setLineItems(rebuilt);
+  };
+
   const subTotal = lineItems.reduce((sum, item) => {
     if (item.isPending) return sum;
     return sum + (Number(item.instanceQty) * Number(item.partQty) * getPrice(item.metricName));
   }, 0);
-  
+
   const vat = subTotal * 0.05;
   const grandTotal = subTotal + vat;
   const hasActiveItems = lineItems.some(item => !item.isPending);
 
   const handleGenerateBoQ = async () => {
-    if (!orgName.trim()) return alert("Organization Name is mandatory.");
+    if (!orgName.trim()) return pushToast('err', 'Organization Name is mandatory.');
     const payloadItems = lineItems.filter(item => !item.isPending).map(item => ({ ...item, unitPrice: getPrice(item.metricName) }));
-    if (payloadItems.length === 0) return alert("Please add at least one valid requirement.");
+    if (payloadItems.length === 0) return pushToast('err', 'Add at least one valid requirement.');
 
+    setIsGenerating(true);
     try {
       const response = await axios.post(`/api/quotes/generate`, {
         organizationName: orgName, quoteDate: todayDate, lineItems: payloadItems
       }, { responseType: 'blob' });
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url; link.setAttribute('download', `${orgName}_BOQ.xlsx`);
       document.body.appendChild(link); link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      pushToast('ok', 'Excel BoQ generated.');
     } catch (error) {
       console.error("Error generating BoQ", error);
+      pushToast('err', 'Generation failed. Check server.');
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   return (
     <div className="app-container">
-      
+
+      {/* Toasts */}
+      <div className="toast-wrap">
+        {toasts.map(t => (
+          <div key={t.id} className={`toast ${t.type}`}>
+            {t.type === 'ok' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+            {t.msg}
+          </div>
+        ))}
+      </div>
+
+      {/* Header */}
       <div className="brand-header">
-        <div className="brand-logo-text" style={{ fontSize: '1.8rem', fontWeight: 'normal' }}>Bangladesh Data Center Company Limited (BDCCL)</div>
-        <p className="brand-subtext" style={{ fontWeight: 'normal' }}>Address: E-14/X, ICT Tower (11th Floor), Agargaon, Dhaka-1207 | Phone: +88-02-55006441</p>
-      </div>
-
-      <div className="control-panel" style={{ marginBottom: '20px' }}>
-        <div style={{ flex: '1', minWidth: '300px' }}>
-          <label className="input-label" style={{ fontWeight: 'normal' }}>Organization Name <span style={{color: 'red'}}>*</span></label>
-          <input type="text" className="text-input" style={{ fontWeight: 'normal' }} value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="e.g., Department of Shipping" />
-        </div>
-        <div style={{ width: '200px' }}>
-          <label className="input-label" style={{ fontWeight: 'normal' }}>Date</label>
-          <input type="text" className="text-input" value={todayDate} disabled style={{ background: '#f8fafc', fontWeight: 'normal' }} />
+        <img src="/logo.png" alt="BDCCL" className="brand-logo-img" />
+        <div>
+          <div className="brand-logo-text">Bangladesh Data Center Company Limited</div>
+          <p className="brand-subtext">Bill of Quantities Generator &middot; ICT Tower (11th Floor), Agargaon, Dhaka-1207 &middot; +88-02-55006441</p>
         </div>
       </div>
 
-      <div className="server-card" style={{ overflowX: 'auto', marginBottom: '20px' }}>
-        <table className="metric-table" style={{ minWidth: '1250px', borderCollapse: 'collapse', width: '100%' }}>
-          <thead style={{ background: 'var(--teal-dark)', color: 'white' }}>
+      {/* Control panel */}
+      <div className="panel control-panel">
+        <div style={{ flex: '1 1 320px' }}>
+          <label className="input-label">Organization Name <span style={{ color: 'var(--danger)' }}>*</span></label>
+          <input type="text" className="text-input" value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Please Enter an Organization Name" />
+        </div>
+        <div style={{ width: '190px' }}>
+          <label className="input-label">Quotation Date</label>
+          <input type="text" className="text-input" value={todayDate} disabled />
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, alignItems: 'center', color: 'var(--text-muted)', fontSize: '.85rem', fontWeight: 600, marginBottom: 10 }}>
+          <LayoutGrid size={16} color="var(--teal-600)" />
+          {lineItems.filter(i => i.isMaster).length} service{lineItems.filter(i => i.isMaster).length !== 1 ? 's' : ''} configured
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="server-card" style={{ overflowX: 'auto' }}>
+        <table className="metric-table" style={{ minWidth: '1250px' }}>
+          <thead>
             <tr>
-              <th style={{ color: 'white', padding: '15px', border: '1px solid #333', width: '9%' }}>SL No.</th>
-              <th style={{ color: 'white', border: '1px solid #333', width: '22%' }}>Service Name</th>
-              <th style={{ color: 'white', border: '1px solid #333', width: '8%' }}>Inst Qty</th>
-              <th style={{ color: 'white', border: '1px solid #333', width: '28%' }}>Requirements/Metric</th>
-              <th style={{ color: 'white', border: '1px solid #333', width: '9%' }}>Part Qty</th>
-              <th style={{ color: 'white', background: '#2c6b6d', border: '1px solid #333', width: '7%' }}>Req Qty</th>
-              <th style={{ color: 'white', border: '1px solid #333', width: '7%' }}>Usage Hrs</th>
-              <th style={{ color: 'white', border: '1px solid #333', width: '9%' }}>Unit Price</th>
-              <th style={{ color: 'white', background: '#1a5456', border: '1px solid #333', width: '10%' }}>Total (BDT)</th>
-              <th style={{ border: '1px solid #333', width: '5%' }}>Action</th>
+              <th style={{ color: 'white', background: 'var(--teal-800)', border: '1px solid var(--teal-900)', width: '9%' }}>SL No.</th>
+              <th style={{ color: 'white', background: 'var(--teal-800)', border: '1px solid var(--teal-900)', width: '22%', textAlign: 'left' }}>Service Name</th>
+              <th style={{ color: 'white', background: 'var(--teal-800)', border: '1px solid var(--teal-900)', width: '8%' }}>Inst Qty</th>
+              <th style={{ color: 'white', background: 'var(--teal-800)', border: '1px solid var(--teal-900)', width: '28%', textAlign: 'left' }}>Requirements/Metric</th>
+              <th style={{ color: 'white', background: 'var(--teal-800)', border: '1px solid var(--teal-900)', width: '9%' }}>Part Qty</th>
+              <th style={{ color: 'white', background: 'var(--teal-600)', border: '1px solid var(--teal-900)', width: '7%' }}>Req Qty</th>
+              <th style={{ color: 'white', background: 'var(--teal-800)', border: '1px solid var(--teal-900)', width: '7%' }}>Usage Hrs</th>
+              <th style={{ color: 'white', background: 'var(--teal-800)', border: '1px solid var(--teal-900)', width: '9%' }}>Unit Price</th>
+              <th style={{ color: 'white', background: 'var(--teal-900)', border: '1px solid var(--teal-900)', width: '10%' }}>Total (BDT)</th>
+              <th style={{ color: 'white', background: 'var(--teal-800)', border: '1px solid var(--teal-900)', width: '5%' }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {lineItems.map((item, index) => {
-              
+
               if (item.isPending) {
                 return (
                   <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
                     <td style={{ verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'center' }}>
-                      <input type="text" className="text-input" style={{ width: '100%', padding: '6px', textAlign: 'center', background: 'transparent', fontWeight: 'normal' }} value={item.reqGroup} disabled />
+                      <span className="chip">{item.reqGroup}</span>
                     </td>
-                    {/* Select box kept STRICTLY in the Service Name column (colSpan=1 instead of 3) */}
                     <td style={{ verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0' }}>
-                      <select className="text-input" style={{ fontWeight: 'normal', cursor: 'pointer', height: '36px', width: '100%' }} onChange={(e) => handleAddPredefinedService(e.target.value, item.groupId)} defaultValue="">
-                        <option value="" disabled>Select a service to add...</option>
-                        {Object.keys(PREDEFINED_SERVICES).map(service => (<option key={service} value={service}>{service}</option>))}
-                      </select>
+                      <Select
+                        options={GROUPED_OPTIONS}
+                        value={null}
+                        onChange={(opt) => handleAddPredefinedService(opt.value, item.groupId)}
+                        menuPortalTarget={document.body}
+                        placeholder="Search & select a service..."
+                        styles={selectStyles}
+                      />
                     </td>
                     <td colSpan="7" style={{ borderRight: '1px solid #e2e8f0' }}></td>
                     <td style={{ padding: '10px', textAlign: 'center' }}><button className="remove-btn" onClick={() => removeItem(item.id)}><Trash2 size={16} /></button></td>
@@ -279,15 +355,15 @@ function App() {
               const groupItems = lineItems.filter(i => i.groupId === item.groupId);
               const masterItem = groupItems.find(i => i.isMaster) || item;
               const isLastInGroup = index === lineItems.length - 1 || lineItems[index + 1].groupId !== item.groupId;
-              
+
               const isBastionOrCompute = masterItem.serverName.includes('Bastion') || masterItem.serverName.includes('Compute Instance');
-              
+
               const hasAddMoreRow = isBastionOrCompute;
               const masterRowSpan = groupItems.length + (hasAddMoreRow ? 1 : 0);
 
               let showInstQty = false;
               let instRowSpan = 1;
-              
+
               if (index === 0 || lineItems[index - 1].subGroupId !== item.subGroupId) {
                 showInstQty = true;
                 for (let i = index + 1; i < lineItems.length; i++) {
@@ -310,45 +386,48 @@ function App() {
               return (
                 <React.Fragment key={item.id}>
                   <tr style={{ borderBottom: isLastInGroup && !hasAddMoreRow ? '2px solid #cbd5e1' : '1px solid #e2e8f0' }}>
-                    
+
                     {item.isMaster && (
                       <>
                         <td rowSpan={masterRowSpan} style={{ background: '#f1f5f9', verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #cbd5e1', textAlign: 'center' }}>
                           <input type="text" className="text-input" style={{ width: '100%', padding: '6px', textAlign: 'center', fontWeight: 'normal' }} value={item.reqGroup} onChange={(e) => updateItem(item.id, 'reqGroup', e.target.value)} placeholder="Req." />
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '8px' }}>
+                            <button className="move-btn" title="Move up" onClick={() => moveGroup(item.groupId, -1)}><ChevronUp size={16} /></button>
+                            <button className="move-btn" title="Move down" onClick={() => moveGroup(item.groupId, 1)}><ChevronDown size={16} /></button>
+                          </div>
                         </td>
                         <td rowSpan={masterRowSpan} style={{ background: '#f1f5f9', verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', borderBottom: '2px solid #cbd5e1' }}>
-                          {/* Dynamic rows for textarea to snap tightly without huge whitespace */}
-                          <textarea 
-                            className="text-input" 
+                          <textarea
+                            className="text-input"
                             rows={item.serverName.length > 25 ? 2 : 1}
-                            style={{ padding: '6px', fontWeight: 'normal', width: '100%', resize: 'none', minHeight: '36px', height: 'auto', fontFamily: 'inherit', lineHeight: '1.4', overflow: 'hidden' }} 
-                            value={item.serverName} 
-                            onChange={(e) => updateItem(item.id, 'serverName', e.target.value)} 
+                            style={{ padding: '6px', fontWeight: 600, color: 'var(--teal-800)', width: '100%', resize: 'none', minHeight: '36px', height: 'auto', fontFamily: 'inherit', lineHeight: '1.4', overflow: 'hidden' }}
+                            value={item.serverName}
+                            onChange={(e) => updateItem(item.id, 'serverName', e.target.value)}
                           />
                         </td>
                       </>
                     )}
-                    
+
                     {showInstQty && (
                       <td rowSpan={instRowSpan} style={{ background: '#f1f5f9', verticalAlign: 'middle', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'center' }}>
                         <input type="number" className="text-input" style={{ padding: '6px', width: '100%', minWidth: '50px', textAlign: 'center', fontWeight: 'normal' }} value={item.instanceQty} onChange={(e) => updateSubGroupInstQty(item.subGroupId, e.target.value)} min="1" />
                       </td>
                     )}
-                    
+
                     <td style={{ padding: '10px', borderRight: '1px solid #e2e8f0' }}>
                       {!item.isCustom ? (
                         <div style={{ fontWeight: 'normal', fontSize: '0.85rem', color: '#1e293b' }}>{item.metricName}</div>
                       ) : (
-                        <Select options={dynamicOptions} value={item.metricName ? { label: item.metricName, value: item.metricName } : null} onChange={(opt) => updateItem(item.id, 'metricName', opt.value)} menuPortalTarget={document.body} placeholder="Select..." styles={{ control: base => ({ ...base, minHeight: '36px', fontSize: '0.85rem' }), menuPortal: base => ({ ...base, zIndex: 9999 }) }} />
+                        <Select options={dynamicOptions} value={item.metricName ? { label: item.metricName, value: item.metricName } : null} onChange={(opt) => updateItem(item.id, 'metricName', opt.value)} menuPortalTarget={document.body} placeholder="Select..." styles={selectStyles} />
                       )}
                     </td>
-                    
+
                     <td style={{ padding: '10px', borderRight: '1px solid #e2e8f0' }}><input type="number" className="text-input" style={{ padding: '6px', width: '100%', fontWeight: 'normal' }} value={item.partQty} onChange={(e) => updateItem(item.id, 'partQty', e.target.value)} min="1" /></td>
-                    <td style={{ background: '#f8fafc', fontWeight: 'normal', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>{reqQty}</td>
+                    <td style={{ background: '#f0f7f7', fontWeight: 700, color: 'var(--teal-700)', textAlign: 'center', borderRight: '1px solid #e2e8f0' }}>{reqQty}</td>
                     <td style={{ padding: '10px', borderRight: '1px solid #e2e8f0' }}><input type="number" className="text-input" style={{ padding: '6px', width: '100%', fontWeight: 'normal' }} value={item.usageHours} onChange={(e) => updateItem(item.id, 'usageHours', e.target.value)} /></td>
-                    <td style={{ fontWeight: 'normal', fontSize: '0.9rem', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'right' }}>{price.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                    <td style={{ fontWeight: 'normal', color: 'var(--teal-dark)', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'right' }}>{(reqQty * price).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                    
+                    <td style={{ fontWeight: 'normal', fontSize: '0.9rem', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'right' }}>{fmt(price)}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--teal-800)', padding: '10px', borderRight: '1px solid #e2e8f0', textAlign: 'right' }}>{fmt(reqQty * price)}</td>
+
                     {item.isMaster ? (
                       <td rowSpan={actionRowSpan} style={{ padding: '10px', textAlign: 'center', verticalAlign: 'middle', borderRight: '1px solid #e2e8f0' }}>
                         <button className="remove-btn" onClick={() => removeItem(item.id)} title="Delete Entire Package"><Trash2 size={18} /></button>
@@ -365,7 +444,7 @@ function App() {
                   {isLastInGroup && hasAddMoreRow && (
                     <tr key={`add-more-row-${item.groupId}`} style={{ borderBottom: '2px solid #cbd5e1' }}>
                       <td style={{ padding: '8px 12px', background: '#fafafa', borderRight: '1px solid #e2e8f0', textAlign: 'left' }}>
-                        <button onClick={() => addSubItemToGroup(item.groupId)} style={{ background: 'transparent', color: 'var(--teal-main)', border: '1px dashed var(--teal-main)', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'normal', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <button className="add-metric-btn" onClick={() => addSubItemToGroup(item.groupId)}>
                           <Plus size={14} /> Add other metric
                         </button>
                       </td>
@@ -376,61 +455,56 @@ function App() {
                 </React.Fragment>
               );
             })}
-            
+
             <tr>
               <td colSpan="10" style={{ padding: '15px 20px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
-                <button onClick={addPendingRequirementRow} style={{ background: '#164e50', color: 'white', border: 'none', padding: '8px 18px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 'normal', display: 'inline-flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                <button className="add-req-btn" onClick={addPendingRequirementRow}>
                   <Plus size={16} /> Add new requirement
                 </button>
               </td>
             </tr>
 
-            {/* --- FLATTENED & CONDITIONAL WEB UI BILLING CALCULATION --- */}
-            {hasActiveItems && (
-              <>
-                <tr>
-                  <td colSpan="5" style={{ background: 'transparent', border: 'none' }}></td>
-                  <td colSpan="3" style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>Subtotal (Per Month)</td>
-                  <td style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>{subTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                  <td style={{ background: 'transparent', border: 'none' }}></td>
-                </tr>
-                <tr>
-                  <td colSpan="5" style={{ background: 'transparent', border: 'none' }}></td>
-                  <td colSpan="3" style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>VAT Rate</td>
-                  <td style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>0.05</td>
-                  <td style={{ background: 'transparent', border: 'none' }}></td>
-                </tr>
-                <tr>
-                  <td colSpan="5" style={{ background: 'transparent', border: 'none' }}></td>
-                  <td colSpan="3" style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>VAT</td>
-                  <td style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc' }}>{vat.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                  <td style={{ background: 'transparent', border: 'none' }}></td>
-                </tr>
-                <tr>
-                  <td colSpan="5" style={{ background: 'transparent', border: 'none' }}></td>
-                  <td colSpan="2" style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc', fontSize: '1.05rem' }}>Total (Per Month)</td>
-                  <td style={{ fontWeight: 'normal', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'center', background: '#f8fafc', fontSize: '1.05rem' }}>BDT</td>
-                  <td style={{ fontWeight: 'bold', padding: '10px', border: '1px solid #e2e8f0', textAlign: 'right', background: '#f8fafc', fontSize: '1.05rem', color: 'var(--teal-dark)' }}>{grandTotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
-                  <td style={{ background: 'transparent', border: 'none' }}></td>
-                </tr>
-                <tr>
-                  <td colSpan="9" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '15px', textAlign: 'left' }}>
-                    <span style={{ fontWeight: 'bold', color: '#1e293b' }}>In Words: </span>
-                    <span style={{ fontStyle: 'italic', color: '#475569' }}>{toWordsBDT(grandTotal)}</span>
-                  </td>
-                  <td style={{ background: 'transparent', border: 'none' }}></td>
-                </tr>
-              </>
+            {!hasActiveItems && (
+              <tr>
+                <td colSpan="10">
+                  <div className="empty-state">
+                    <LayoutGrid size={40} color="var(--teal-500)" />
+                    <h3>No services yet</h3>
+                    <p>Pick a service from the dropdown above to start building the Bill of Quantities.</p>
+                  </div>
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: '30px', marginBottom: '40px' }}>
-        <button className="btn btn-gold" onClick={handleGenerateBoQ} style={{ height: '50px', fontSize: '1.1rem', padding: '0 30px', fontWeight: 'normal' }}>
-          <FileSpreadsheet size={22} style={{marginRight: '10px'}}/> Generate Excel Output
+{/* Totals dock */}
+      {hasActiveItems && (
+        <div className="totals-dock">
+          <div className="dock-words"><strong>In Words:</strong> {toWordsBDT(grandTotal)}</div>
+          <div className="dock-figures">
+            <div className="dock-fig"><small>Subtotal / Month</small><b>{fmt(subTotal)}</b></div>
+            <div className="dock-fig"><small>VAT (5%)</small><b>{fmt(vat)}</b></div>
+            <div className="dock-fig grand"><small>Grand Total (BDT)</small><b>{fmt(grandTotal)}</b></div>
+          </div>
+        </div>
+      )}
+
+      {/* Generate button — last on page */}
+      <div style={{ textAlign: 'center', marginTop: '28px', marginBottom: '40px' }}>
+        <button className="btn btn-gold" onClick={handleGenerateBoQ} disabled={isGenerating} style={{ height: '52px', fontSize: '1.05rem', padding: '0 34px' }}>
+          {isGenerating ? <><span className="spin" /> Generating…</> : <><FileSpreadsheet size={22} /> Generate Excel Output</>}
         </button>
       </div>
+
+      <footer className="app-footer">
+        Developed by <strong>Md Mazharul Islam</strong>, Assistant Manager (Cloud), BDCCL
+        <span className="footer-links">
+          <a href="https://www.linkedin.com/in/mazharul-i-tusar/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          <a href="https://github.com/mazharulmd" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </span>
+      </footer>
 
     </div>
   );
